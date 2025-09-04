@@ -1,4 +1,4 @@
---// Mutation Data
+--// Mutation Data (nama + warna)
 local MUTATION_DATA = {
     Shiny = Color3.fromRGB(255, 223, 0),
     Radiant = Color3.fromRGB(0, 255, 255),
@@ -9,14 +9,15 @@ local MUTATION_DATA = {
     Blueberry = Color3.fromRGB(65, 105, 225),
 }
 
---// Variabel
+--// Service
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 
+--// Variabel
 local espEnabled = false
 local espObjects = {}
 
---// Buat GUI
+--// GUI
 local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "PetESP_GUI"
 
@@ -88,10 +89,26 @@ statusLabel.TextColor3 = Color3.new(1,1,1)
 statusLabel.TextSize = 14
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
---// Fungsi buat ESP
-local function createESP(obj)
-    if obj:FindFirstChild("ESP") then return end
+--// Fungsi ambil mutation fleksibel
+local function getMutation(model)
+    -- langsung ValueObject bernama Mutation
+    if model:FindFirstChild("Mutation") and model.Mutation:IsA("StringValue") then
+        return model.Mutation.Value
+    end
+    -- di dalam folder Stats
+    if model:FindFirstChild("Stats") and model.Stats:FindFirstChild("Mutation") then
+        return model.Stats.Mutation.Value
+    end
+    -- Attribute
+    if model:GetAttribute("Mutation") then
+        return model:GetAttribute("Mutation")
+    end
+    return nil
+end
 
+--// Buat ESP
+local function createESP(obj)
+    if espObjects[obj] then return end
     local attachPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
     if not attachPart then return end
 
@@ -114,25 +131,30 @@ local function createESP(obj)
     espObjects[obj] = {billboard = billboard, label = text}
 end
 
+-- Hapus semua ESP
 local function removeAllESP()
-    for obj, data in pairs(espObjects) do
-        if data.billboard then data.billboard:Destroy() end
+    for _, data in pairs(espObjects) do
+        if data.billboard then
+            data.billboard:Destroy()
+        end
     end
     espObjects = {}
 end
 
+-- Update ESP
 local function updateESP()
     for _,v in pairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and v:FindFirstChild("Mutation") then
-            if not espObjects[v] then
-                createESP(v)
-            end
-            -- update text
-            local mut = v.Mutation.Value
-            local lbl = espObjects[v] and espObjects[v].label
-            if lbl then
-                lbl.Text = "["..mut.."] "..v.Name
-                lbl.TextColor3 = MUTATION_DATA[mut] or Color3.fromRGB(200,200,200)
+        if v:IsA("Model") then
+            local mut = getMutation(v)
+            if mut then
+                if not espObjects[v] then
+                    createESP(v)
+                end
+                local lbl = espObjects[v] and espObjects[v].label
+                if lbl then
+                    lbl.Text = "["..mut.."] "..v.Name
+                    lbl.TextColor3 = MUTATION_DATA[mut] or Color3.fromRGB(200,200,200)
+                end
             end
         end
     end
@@ -153,10 +175,10 @@ espButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Reroll Dummy
+-- Dummy Reroll
 rerollButton.MouseButton1Click:Connect(function()
     statusLabel.Text = "Status: Rerolling..."
-    wait(1)
+    task.wait(1)
     statusLabel.Text = "Status: ESP "..(espEnabled and "Active" or "Off")
 end)
 
@@ -177,7 +199,7 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Loop Update ESP
+-- Loop Update
 RunService.RenderStepped:Connect(function()
     if espEnabled then
         updateESP()
